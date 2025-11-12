@@ -21,10 +21,10 @@ app.get('/', (req, res) => {
 });
 
 app.post('/api/chat', async (req, res) => {
-  try {
-    let { sessionId, userPrompt } = req.body;
-    let conversation;
+  let { sessionId, userPrompt } = req.body;
+  let conversation;
 
+  try {
     if (!sessionId) {
       sessionId = crypto.randomUUID();
       conversation = new Conversation({
@@ -39,6 +39,8 @@ app.post('/api/chat', async (req, res) => {
     }
 
     conversation.messages.push({ role: 'user', content: userPrompt });
+  
+    await conversation.save();
 
     const historyForAI = conversation.messages.map(({ role, content }) => ({
       role,
@@ -50,10 +52,10 @@ app.post('/api/chat', async (req, res) => {
       user_prompt: userPrompt
     });
 
+    const { cern_response, thought_process } = hfApiResponse.data;
 
-    const { cern_response, thought_process } = hfApiResponse.data
     conversation.messages.push({ role: 'cern', content: cern_response });
-
+    
     await conversation.save();
 
     res.json({
@@ -63,8 +65,13 @@ app.post('/api/chat', async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error in /api/chat:", error);
-    res.status(500).json({ error: "Something went wrong on the server." });
+    
+    console.error("Error in /api/chat:", error.message);
+    
+    res.status(500).json({
+      error: "The AI model is not responding. Please try again later.",
+      sessionId: sessionId 
+    });
   }
 });
 
